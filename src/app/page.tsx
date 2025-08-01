@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/auth/login-form';
 import { RegisterForm } from '@/components/auth/register-form';
@@ -60,6 +60,8 @@ function AuthPageContent() {
 
 export default function Home() {
     return (
-        <AuthPageContent />
+        <Suspense fallback={<div>Loading...</div>}>
+            <AuthPageContent />
+        </Suspense>
     );
 }
