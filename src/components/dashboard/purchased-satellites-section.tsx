@@ -85,7 +85,7 @@ const PurchasedSatellitesSection = () => {
                             const daysPassed = (new Date().getTime() - purchaseDate.getTime()) / (1000 * 3600 * 24);
                             const progressPercentage = Math.min((daysPassed / satellite.durationDays) * 100, 100);
 
-                            const totalYield = satellite.price * (satellite.dailyYield / 100) * satellite.durationDays;
+                            const dailyYieldAmount = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(satellite.price * (satellite.dailyYield / 100));
 
 
                             return (
@@ -111,7 +111,7 @@ const PurchasedSatellitesSection = () => {
                                     <CardContent className="p-4 pt-0 flex-grow flex flex-col justify-between space-y-4">
                                         <div>
                                             <div className="text-sm text-green-600 font-semibold mb-2">
-                                                Rendimiento Total: +{new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(totalYield)} ({satellite.dailyYield}% diario)
+                                                Rendimiento: +{dailyYieldAmount} / día ({satellite.dailyYield}%)
                                             </div>
                                             <div className="text-center bg-muted/50 p-3 rounded-lg">
                                                 <p className="text-xs text-muted-foreground">Próximo rendimiento en:</p>
