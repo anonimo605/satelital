@@ -85,6 +85,17 @@ const RechargeRequests = () => {
                     const currentBalance = userData.balance || 0;
                     batch.update(userRef, { balance: currentBalance + request.amount });
 
+                    // This must be done outside the batch, after commit.
+                    // Or we need to pass the batch to createTransaction.
+                    // Let's call it after the batch.
+                    await createTransaction({
+                        userId: request.userId,
+                        type: 'credit',
+                        amount: request.amount,
+                        description: `Recarga de saldo aprobada (Ref: ${request.referenceNumber})`,
+                    });
+
+
                     // Referral Commission Logic
                     const approvedRechargesQuery = query(collection(db, 'paymentRequests'), where('userId', '==', request.userId), where('status', '==', 'approved'));
                     const approvedRechargesSnapshot = await getDocs(approvedRechargesQuery);
