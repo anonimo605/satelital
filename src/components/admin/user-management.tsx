@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Edit, Trash2, Archive, Copy, Users } from 'lucide-react';
+import { Edit, Trash2, Archive, Copy, Users, History } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,8 +34,9 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, getDocs, addDoc, getDoc, query, where, runTransaction } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, getDocs, addDoc, getDoc, query, where, runTransaction, orderBy } from 'firebase/firestore';
 import { createTransaction } from '@/services/transactionService';
+import { cn } from '@/lib/utils';
 
 const editBalanceSchema = z.object({
     amount: z.coerce.number().positive("El monto debe ser un número positivo."),
@@ -52,6 +53,9 @@ const UserManagement = () => {
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [viewingUser, setViewingUser] = useState<UserWithSatellites | null>(null);
     const [viewingReferralsOfUser, setViewingReferralsOfUser] = useState<{user: User, referrals: User[]} | null>(null);
+    const [viewingTransactionsOfUser, setViewingTransactionsOfUser] = useState<User | null>(null);
+    const [userTransactions, setUserTransactions] = useState<Transaction[]>([]);
+
 
     const { toast } = useToast();
 
@@ -95,6 +99,32 @@ const UserManagement = () => {
             toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los satélites del usuario." });
         }
     };
+    
+    const handleViewTransactions = async (user: User) => {
+        try {
+            const transQuery = query(
+                collection(db, "transactions"), 
+                where("userId", "==", user.id)
+            );
+             const snapshot = await getDocs(transQuery);
+             const transData = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        date: (data.date as Timestamp).toDate(),
+                    } as Transaction;
+                });
+            transData.sort((a, b) => b.date.getTime() - a.date.getTime());
+            setUserTransactions(transData);
+            setViewingTransactionsOfUser(user);
+
+        } catch(error) {
+            console.error("Error fetching user transactions:", error);
+            toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar las transacciones del usuario." });
+        }
+    };
+
 
     const handleViewReferrals = async (user: User) => {
         if (!user.referredUsers || user.referredUsers.length === 0) {
@@ -265,6 +295,9 @@ const UserManagement = () => {
                                                 <Button variant="ghost" size="icon" onClick={() => handleViewSatellites(user)}>
                                                     <Archive className="h-4 w-4" />
                                                 </Button>
+                                                <Button variant="ghost" size="icon" onClick={() => handleViewTransactions(user)}>
+                                                    <History className="h-4 w-4" />
+                                                </Button>
                                                  <Button variant="ghost" size="icon" onClick={() => handleViewReferrals(user)} disabled={!user.referredUsers || user.referredUsers.length === 0}>
                                                     <Users className="h-4 w-4" />
                                                 </Button>
@@ -278,7 +311,7 @@ const UserManagement = () => {
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>¿Estás realmente seguro?</AlertDialogTitle>
                                                             <AlertDialogDescription>
-                                                                Esta acción no se puede deshacer. Esto eliminará permanentemente al usuario y toda su información. La subcolección de satélites deberá ser eliminada manualmente o con una Cloud Function.
+                                                                Esta acción no se puede deshacer. Esto eliminará permanentemente al usuario y toda su información. La subcolección de satélites deberá ser eliminada manually o con una Cloud Function.
                                                             </AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
@@ -475,6 +508,51 @@ const UserManagement = () => {
                                     <TableRow>
                                         <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                                             Este usuario no tiene referidos.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+             <Dialog open={!!viewingTransactionsOfUser} onOpenChange={(isOpen) => !isOpen && setViewingTransactionsOfUser(null)}>
+                <DialogContent className="sm:max-w-2xl">
+                     <DialogHeader>
+                        <DialogTitle>Historial de Transacciones de {viewingTransactionsOfUser?.phoneNumber}</DialogTitle>
+                        <DialogDescription>
+                            Aquí puedes ver todos los movimientos de saldo del usuario seleccionado.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Descripción</TableHead>
+                                    <TableHead className="text-right">Monto</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {userTransactions.length > 0 ? (
+                                    userTransactions.map((t) => (
+                                        <TableRow key={t.id}>
+                                            <TableCell>{t.date.toLocaleString('es-CO')}</TableCell>
+                                            <TableCell>{t.description}</TableCell>
+                                            <TableCell className={cn(
+                                                "text-right font-semibold",
+                                                t.type === 'credit' ? 'text-green-600' : 'text-red-600'
+                                            )}>
+                                                {t.type === 'credit' ? '+' : '-'}
+                                                {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(t.amount)}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-center text-muted-foreground py-16">
+                                            Este usuario no tiene transacciones.
                                         </TableCell>
                                     </TableRow>
                                 )}
